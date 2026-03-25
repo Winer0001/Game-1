@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>B-COIN: ULTIMATE</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root { --acc: #ff9800; --bg: #050505; --card: #121212; --txt: #fafafa; }
+        
+        /* Убираем скролл у всего тела, чтобы не дергалось */
+        body { 
+            background: var(--bg); color: var(--txt); 
+            font-family: 'Segoe UI', sans-serif; 
+            margin: 0; padding: 0; 
+            height: 100vh; display: flex; flex-direction: column;
+            overflow: hidden; user-select: none; touch-action: manipulation;
+        }
+
+        /* Шапка со статами (Фиксированная) */
+        .header { padding: 10px; background: var(--bg); z-index: 10; border-bottom: 1px solid #222; }
+        .hud { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 5px; }
+        .stat-card { background: var(--card); border: 1px solid #333; padding: 6px; border-radius: 8px; font-size: 0.65rem; }
+        .val { font-weight: bold; color: var(--acc); font-size: 0.9rem; }
+        
+        #balance-container { text-align: center; padding: 10px 0; }
+        #balance { font-size: 2.2rem; color: var(--acc); font-weight: 900; }
+
+        /* Зона клика (Занимает свободное место, но не слишком много) */
+        .game-zone { 
+            flex-shrink: 0; height: 160px; 
+            display: flex; align-items: center; justify-content: center; 
+            position: relative; background: radial-gradient(circle, #1a1a1a 0%, #050505 100%);
+        }
+        #target { font-size: 6rem; cursor: pointer; transition: 0.1s; z-index: 5; }
+        #target:active { transform: scale(0.8); }
+
+        /* Табы (Фиксированные) */
+        .tabs { 
+            display: flex; gap: 5px; padding: 10px; 
+            background: var(--bg); border-top: 1px solid #222; border-bottom: 1px solid #222;
+            overflow-x: auto; scrollbar-width: none;
+        }
+        .t-btn { background: #1a1a1a; border: 1px solid #333; color: #666; padding: 8px 15px; border-radius: 20px; font-size: 0.75rem; white-space: nowrap; }
+        .t-btn.active { background: var(--acc); color: #000; font-weight: bold; border-color: var(--acc); }
+
+        /* ГЛАВНОЕ: Область контента со скроллом */
+        .content-area { 
+            flex-grow: 1; 
+            overflow-y: auto; /* Позволяет листать вниз */
+            padding: 10px;
+            background: #080808;
+            -webkit-overflow-scrolling: touch; /* Плавный скролл на iPhone */
+        }
+        .page { display: none; padding-bottom: 30px; }
+        .page.active { display: block; }
+
+        /* Карточки товаров */
+        .upgrade-card { 
+            background: #161616; padding: 12px; margin-bottom: 8px; 
+            border-radius: 12px; display: flex; justify-content: space-between; 
+            align-items: center; border: 1px solid #222;
+        }
+        .info-block { flex-grow: 1; margin-right: 10px; }
+        .info-block strong { display: block; font-size: 0.9rem; color: #fff; }
+        .info-block small { color: #888; font-size: 0.75rem; }
+        .price { color: var(--acc); font-weight: bold; font-size: 0.85rem; margin-top: 4px; }
+        
+        .buy-btn { background: #2e7d32; color: #fff; border: none; padding: 10px 14px; border-radius: 8px; font-weight: bold; font-size: 0.75rem; min-width: 80px; }
+        .buy-btn:disabled { background: #222; color: #444; }
+
+        /* Эффекты */
+        #fx-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+        .floating-num { position: absolute; font-weight: bold; color: var(--acc); animation: fly 0.8s forwards; }
+        @keyframes fly { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
+    </style>
+</head>
+<body>
+
+<div id="fx-layer"></div>
+
+<div id="game-ui" style="display: flex; flex-direction: column; height: 100vh; width: 100%;">
+    
+    <div class="header">
+        <div class="hud">
+            <div class="stat-card">⚡ Энергия: <span id="en-v" class="val">100</span></div>
+            <div class="stat-card">🍔 Сытость: <span id="fd-v" class="val">100</span>%</div>
+            <div class="stat-card">⭐ Уровень: <span id="lv-v" class="val">1</span></div>
+            <div class="stat-card">🎭 Карма: <span id="km-v" class="val">0</span></div>
+        </div>
+        <div id="balance-container">
+            <div id="balance">0.0</div>
+            <div id="passive-info" style="font-size: 0.8rem; color: #4caf50;">+0.0 B/сек</div>
+        </div>
+    </div>
+
+    <div class="game-zone">
+        <div id="target">🗑️</div>
+    </div>
+
+    <div class="tabs">
+        <button class="t-btn active" onclick="tab('market')">🛒 Магазин</button>
+        <button class="t-btn" onclick="tab('jobs')">💼 Бизнес</button>
+        <button class="t-btn" onclick="tab('casino')">🎰 Казино</button>
+        <button class="t-btn" onclick="tab('skills')">🧬 Навыки</button>
+    </div>
+
+    <div class="content-area">
+        <div id="market" class="page active">
+            </div>
+        <div id="jobs" class="page">
+            <div class="upgrade-card">
+                <div class="info-block"><strong>Сбор бутылок</strong><small>+1.0 B/сек в офлайне</small><div class="price">200 B</div></div>
+                <button class="buy-btn" onclick="buy('auto', 200, 1)">Нанять</button>
+            </div>
+            </div>
+        <div id="casino" class="page">
+            <div class="upgrade-card">
+                <div class="info-block"><strong>Наперстки</strong><small>Шанс х3 или 0</small><div class="price">50 B</div></div>
+                <button class="buy-btn" onclick="gamble(50)">ИГРАТЬ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.ready(); tg.expand();
+
+    let s = JSON.parse(localStorage.getItem('b_god_v2')) || {
+        b:0, en:100, mEn:100, fd:100, xp:0, lv:1, km:0, pwr:1, auto:0, ts: Date.now()
+    };
+
+    const ITEMS = [
+        {id:'i1', n:'Перчатки', d:'+0.5 к клику', p:20, step:1.5},
+        {id:'i2', n:'Газета', d:'+1.2 к клику', p:100, step:1.6},
+        {id:'i3', n:'Тачка', d:'+3.0 к клику', p:500, step:1.7},
+        {id:'i4', n:'Дошик', d:'Восполнить еду', p:15, step:1.1},
+        {id:'i5', n:'Энергетик', d:'Восполнить силы', p:30, step:1.2},
+        {id:'i6', n:'Кроссовки', d:'+50 макс. энергии', p:1000, step:2}
+    ];
+
+    function init() {
+        renderShop();
+        update();
+        setInterval(loop, 1000);
+        // Офлайн расчет
+        let diff = Math.floor((Date.now() - s.ts)/1000);
+        if(diff > 5 && s.auto > 0) {
+            s.b += (s.auto * diff);
+            s.en = Math.min(s.mEn, s.en + Math.floor(diff/20));
+        }
+    }
+
+    function loop() {
+        if(s.auto > 0) s.b += s.auto;
+        if(s.en < s.mEn) s.en += 0.1;
+        s.fd = Math.max(0, s.fd - 0.02);
+        update();
+        save();
+    }
+
+    document.getElementById('target').addEventListener('click', (e) => {
+        if(s.en >= 1 && s.fd > 0) {
+            s.b += s.pwr; s.en -= 0.5; s.xp += 1;
+            if(s.xp >= s.lv * 100) { s.lv++; s.mEn += 10; }
+            spawnFx(e, "+" + s.pwr.toFixed(1));
+            tg.HapticFeedback.impactOccurred('light');
+            update();
+        }
+    });
+
+    function renderShop() {
+        let h = '';
+        ITEMS.forEach(i => {
+            h += `<div class="upgrade-card">
+                <div class="info-block"><strong>${i.n}</strong><small>${i.d}</small><div class="price">${Math.floor(i.p)} B</div></div>
+                <button class="buy-btn" id="btn-${i.id}" onclick="buyItem('${i.id}')">КУПИТЬ</button>
+            </div>`;
+        });
+        document.getElementById('market').innerHTML = h;
+    }
+
+    function buyItem(id) {
+        let i = ITEMS.find(x => x.id === id);
+        if(s.b >= i.p) {
+            s.b -= i.p;
+            if(id === 'i1') s.pwr += 0.5;
+            if(id === 'i2') s.pwr += 1.2;
+            if(id === 'i4') s.fd = 100;
+            if(id === 'i5') s.en = s.mEn;
+            i.p *= i.step;
+            renderShop(); update(); save();
+        }
+    }
+
+    function buy(type, price, val) {
+        if(s.b >= price) {
+            s.b -= price;
+            if(type === 'auto') s.auto += val;
+            update(); save();
+        }
+    }
+
+    function tab(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.t-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    function spawnFx(e, t) {
+        let f = document.createElement('div');
+        f.className = 'floating-num';
+        f.innerText = t;
+        f.style.left = e.pageX + 'px';
+        f.style.top = e.pageY + 'px';
+        document.getElementById('fx-layer').appendChild(f);
+        setTimeout(()=>f.remove(), 800);
+    }
+
+    function update() {
+        document.getElementById('balance').innerText = s.b.toFixed(1);
+        document.getElementById('en-v').innerText = Math.floor(s.en);
+        document.getElementById('fd-v').innerText = Math.floor(s.fd);
+        document.getElementById('lv-v').innerText = s.lv;
+        document.getElementById('km-v').innerText = s.km;
+        document.getElementById('passive-info').innerText = `+${s.auto.toFixed(1)} B/сек`;
+        
+        ITEMS.forEach(i => {
+            let b = document.getElementById('btn-'+i.id);
+            if(b) b.disabled = s.b < i.p;
+        });
+    }
+
+    function save() { s.ts = Date.now(); localStorage.setItem('b_god_v2', JSON.stringify(s)); }
+
+    init();
+</script>
+</body>
+</html>
