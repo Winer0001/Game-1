@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>B-Coin: Homeless Empire</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root { --main-bg: #0f0f0f; --accent: #ff9800; --text: #e0e0e0; }
+        body { background: var(--main-bg); color: var(--text); font-family: sans-serif; margin: 0; padding: 10px; touch-action: manipulation; }
+        
+        .card { background: #1a1a1a; border: 1px solid #333; border-radius: 15px; padding: 15px; margin-bottom: 15px; }
+        #balance { font-size: 2.5rem; color: var(--accent); font-weight: bold; text-align: center; margin: 10px 0; }
+        
+        .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.75rem; }
+        .bar-bg { width: 100%; height: 6px; background: #333; border-radius: 3px; margin-top: 4px; overflow: hidden; }
+        .bar-fill { height: 100%; transition: 0.3s; }
+
+        .main-action { height: 200px; display: flex; align-items: center; justify-content: center; position: relative; }
+        #target { font-size: 8rem; cursor: pointer; transition: 0.1s; user-select: none; }
+        #target:active { transform: scale(0.9); }
+
+        .tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 5px; }
+        .tab-btn { background: #252525; border: none; color: #888; padding: 10px 18px; border-radius: 20px; font-size: 0.8rem; white-space: nowrap; }
+        .tab-btn.active { background: var(--accent); color: #000; font-weight: bold; }
+
+        .content { display: none; background: #1a1a1a; border-radius: 15px; padding: 10px; border: 1px solid #333; }
+        .content.active { display: block; }
+        
+        .item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #222; }
+        .buy-btn { background: #4caf50; color: #fff; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 0.8rem; }
+        .buy-btn:disabled { background: #333; color: #666; }
+
+        input { padding: 15px; border-radius: 10px; border: 1px solid #333; background: #222; color: #fff; width: 90%; margin-bottom: 15px; }
+        .btn-reg { background: var(--accent); color: #000; padding: 15px; border: none; border-radius: 10px; font-weight: bold; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="reg-screen" style="display:none; text-align:center; margin-top:50px;">
+        <h1 style="color:var(--accent)">B-COIN EMPIRE</h1>
+        <input type="text" id="fn" placeholder="Имя">
+        <input type="text" id="ln" placeholder="Фамилия">
+        <button class="btn-reg" onclick="register()">НАЧАТЬ ПУТЬ</button>
+    </div>
+
+    <div id="game-screen" style="display:none;">
+        <div class="card">
+            <div id="rank" style="color:var(--accent); font-size:0.7rem; font-weight:bold;">ЭПОХА: ГРЯЗЬ</div>
+            <div id="balance">0.0 B</div>
+            <div class="stats-row">
+                <div>⚡ Энергия: <span id="en-txt">100</span>% <div class="bar-bg"><div id="en-bar" class="bar-fill" style="background:#4caf50; width:100%"></div></div></div>
+                <div>🍔 Сытость: <span id="fd-txt">100</span>% <div class="bar-bg"><div id="fd-bar" class="bar-fill" style="background:#2196f3; width:100%"></div></div></div>
+            </div>
+        </div>
+
+        <div class="main-action">
+            <div id="target">🗑️</div>
+        </div>
+        <div id="log" style="text-align:center; height:20px; font-size:0.8rem; color:#888; margin-bottom:10px;"></div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="tab('shop')">🛒 Магазин</button>
+            <button class="tab-btn" onclick="tab('biz')">💼 Бизнес</button>
+        </div>
+
+        <div id="shop" class="content active">
+            <div class="item"><div><strong>🧤 Перчатки</strong><br><small>+0.2 B за клик</small></div><button class="buy-btn" id="i1" onclick="buy('p', 20)">20 B</button></div>
+            <div class="item"><div><strong>🍔 Дошик</strong><br><small>Восполнить сытость</small></div><button class="buy-btn" id="i2" onclick="buy('f', 10)">10 B</button></div>
+        </div>
+
+        <div id="biz" class="content">
+            <div class="item"><div><strong>🏪 Сбор картона</strong><br><small>+1.0 B / 5 сек</small></div><button class="buy-btn" id="i3" onclick="buy('b', 150)">150 B</button></div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready(); tg.expand();
+
+        let s = JSON.parse(localStorage.getItem('b_empire_v5')) || null;
+
+        if (s) showGame(); else document.getElementById('reg-screen').style.display='block';
+
+        function register() {
+            const f = document.getElementById('fn').value;
+            const l = document.getElementById('ln').value;
+            if (f && l) {
+                s = { f, l, b: 0, en: 100, fd: 100, pwr: 0.1, auto: 0 };
+                save(); showGame();
+            }
+        }
+
+        function showGame() {
+            document.getElementById('reg-screen').style.display='none';
+            document.getElementById('game-screen').style.display='block';
+            update();
+        }
+
+        document.getElementById('target').addEventListener('click', () => {
+            if (s.en >= 1 && s.fd > 0) {
+                let g = s.pwr;
+                s.en -= 1; s.fd -= 0.3;
+                if (Math.random() < 0.05) { g += 5; log("💎 Нашел заначку! +5B"); }
+                s.b += g;
+                tg.HapticFeedback.impactOccurred('light');
+                update(); save();
+            } else { log("⚠️ Нет сил или голоден!"); }
+        });
+
+        function buy(t, p) {
+            if (s.b >= p) {
+                s.b -= p;
+                if (t === 'p') s.pwr += 0.2;
+                if (t === 'f') s.fd = 100;
+                if (t === 'b') s.auto += 1;
+                tg.HapticFeedback.notificationOccurred('success');
+                update(); save();
+            }
+        }
+
+        function tab(id) {
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        setInterval(() => {
+            if (s) {
+                if (s.auto > 0) s.b += s.auto;
+                if (s.en < 100) s.en = Math.min(100, s.en + 2);
+                s.fd = Math.max(0, s.fd - 0.5);
+                update(); save();
+            }
+        }, 5000);
+
+        function log(m) { document.getElementById('log').innerText = m; setTimeout(()=>document.getElementById('log').innerText="", 3000); }
+
+        function update() {
+            document.getElementById('balance').innerText = s.b.toFixed(1) + " B";
+            document.getElementById('en-txt').innerText = s.en;
+            document.getElementById('en-bar').style.width = s.en + "%";
+            document.getElementById('fd-txt').innerText = Math.floor(s.fd);
+            document.getElementById('fd-bar').style.width = s.fd + "%";
+            
+            document.getElementById('i1').disabled = s.b < 20;
+            document.getElementById('i2').disabled = s.b < 10;
+            document.getElementById('i3').disabled = s.b < 150;
+            
+            if (s.b > 1000) document.getElementById('rank').innerText = "ЭПОХА: УЛИЦА";
+        }
+
+        function save() { localStorage.setItem('b_empire_v5', JSON.stringify(s)); }
+    </script>
+</body>
+</html>
