@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>B-Coin Tycoon</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background: #121212; color: #e0e0e0; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; touch-action: manipulation; }
+        
+        /* Регистрация */
+        #reg-screen { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 300px; margin-top: 50px; text-align: center; }
+        input { padding: 15px; border-radius: 10px; border: 1px solid #333; background: #222; color: #fff; font-size: 1rem; }
+        .btn-start { background: #ff9800; color: #000; padding: 15px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+
+        /* Игра */
+        #game-screen { display: none; width: 100%; text-align: center; }
+        .header { background: #1e1e1e; padding: 20px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
+        #balance { font-size: 3rem; color: #ff9800; font-weight: bold; margin: 10px 0; }
+        
+        /* Энергия */
+        .energy-container { width: 100%; height: 10px; background: #333; border-radius: 5px; margin: 10px 0; overflow: hidden; }
+        #energy-bar { width: 100%; height: 100%; background: #4caf50; transition: 0.3s; }
+
+        #trash-can { font-size: 9rem; cursor: pointer; transition: 0.1s; margin: 30px 0; user-select: none; filter: drop-shadow(0 0 10px rgba(0,0,0,0.5)); }
+        #trash-can:active { transform: scale(0.9); }
+        .hint { color: #888; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <div id="reg-screen">
+        <h1>B-COIN MINER</h1>
+        <p>Как тебя звать, бродяга?</p>
+        <input type="text" id="fname" placeholder="Имя">
+        <input type="text" id="lname" placeholder="Фамилия">
+        <button class="btn-start" onclick="register()">НАЧАТЬ ПУТЬ</button>
+    </div>
+
+    <div id="game-screen">
+        <div class="header">
+            <div id="player-name" style="font-weight: bold;">Бродяга</div>
+            <div id="balance">0.0 B-Coins</div>
+            <div style="font-size: 0.8rem; margin-top: 5px;">Энергия: <span id="energy-text">100</span>%</div>
+            <div class="energy-container"><div id="energy-bar"></div></div>
+        </div>
+
+        <div id="trash-can">🗑️</div>
+        <p class="hint">Рыться в мусоре (-1% энергии)</p>
+        <p id="msg" style="color: #ff5252; min-height: 20px;"></p>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let state = JSON.parse(localStorage.getItem('b_coin_data')) || null;
+
+        if (state) showGame();
+
+        function register() {
+            const f = document.getElementById('fname').value;
+            const l = document.getElementById('lname').value;
+            if (f && l) {
+                state = { fname: f, lname: l, balance: 0, energy: 100 };
+                save();
+                showGame();
+            } else { alert("Заполни анкету!"); }
+        }
+
+        function showGame() {
+            document.getElementById('reg-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+            document.getElementById('player-name').innerText = state.fname + " " + state.lname;
+            updateUI();
+        }
+
+        document.getElementById('trash-can').addEventListener('click', () => {
+            if (state.energy >= 1) {
+                state.balance += 0.1;
+                state.energy -= 1;
+                document.getElementById('msg').innerText = "";
+                tg.HapticFeedback.impactOccurred('medium');
+                updateUI();
+                save();
+            } else {
+                document.getElementById('msg').innerText = "Ты слишком устал. Подожди...";
+            }
+        });
+
+        // Восстановление энергии (1% в 3 секунды)
+        setInterval(() => {
+            if (state && state.energy < 100) {
+                state.energy += 1;
+                updateUI();
+                save();
+            }
+        }, 3000);
+
+        function updateUI() {
+            document.getElementById('balance').innerText = state.balance.toFixed(1) + " B-Coins";
+            document.getElementById('energy-text').innerText = state.energy;
+            document.getElementById('energy-bar').style.width = state.energy + "%";
+            // Цвет энергии
+            document.getElementById('energy-bar').style.background = state.energy < 20 ? "#ff5252" : "#4caf50";
+        }
+
+        function save() { localStorage.setItem('b_coin_data', JSON.stringify(state)); }
+    </script>
+</body>
+</html>
