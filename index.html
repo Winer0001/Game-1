@@ -1,45 +1,65 @@
-import asyncio
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Crypto Clicker</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            background: radial-gradient(circle, #1e1e2f 0%, #000000 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        #score { font-size: 4rem; margin-bottom: 20px; color: #f1c40f; text-shadow: 0 0 20px rgba(241, 196, 15, 0.5); }
+        #coin {
+            width: 220px;
+            height: 220px;
+            background: linear-gradient(145deg, #f1c40f, #d35400);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 6rem;
+            cursor: pointer;
+            box-shadow: 0 0 60px rgba(243, 156, 18, 0.6);
+            transition: transform 0.05s active;
+            user-select: none;
+        }
+        #coin:active { transform: scale(0.92); }
+    </style>
+</head>
+<body>
+    <div id="score">0</div>
+    <div id="coin">🪙</div>
 
-# 1. Твой актуальный токен (который заканчивается на ...OijohQ)
-API_TOKEN = '8707704969:AAEhh0qqv21grLAj0dUjMkSU9fc0_OijohQ'
+    <script>
+        const tg = window.Telegram.WebApp;
+        let score = 0;
+        const scoreElement = document.getElementById('score');
+        const coin = document.getElementById('coin');
 
-# 2. Твоя ссылка на игру в GitHub
-GAME_URL = "https://winer0001.github.io/Game-1/index.html?v=2"
+        // Инициализация WebApp
+        tg.ready();
+        tg.expand(); // Развернуть на весь экран
 
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
-
-@dp.message(Command("start"))
-async def start_command(message: types.Message):
-    # Создаем Inline-кнопку для открытия Web App (твоей игры)
-    kb = [
-        [types.InlineKeyboardButton(
-            text="Открыть игру! 🪙", 
-            web_app=types.WebAppInfo(url=GAME_URL)
-        )]
-    ]
-    keyboard = types.InlineKeyboardMarkup(inline_keyboard=kb)
-    
-    await message.answer(
-        f"Привет, {message.from_user.first_name}! 👋\n\n"
-        "Твой личный кликер готов. Нажми на кнопку ниже, чтобы начать тапать!",
-        reply_markup=keyboard
-    )
-
-async def main():
-    # ЭТА СТРОЧКА ЛЕЧИТ ОШИБКУ CONFLICT:
-    # Она принудительно закрывает старые соединения перед стартом
-    await bot.delete_webhook(drop_pending_updates=True)
-    
-    print("--- ПОБЕДА: Бот запущен без ошибок! ---")
-    print("Иди в Telegram и нажми /start")
-    
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("Бот выключен")
+        coin.addEventListener('click', () => {
+            score++;
+            scoreElement.innerText = score;
+            
+            // Легкая вибрация при клике
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+        });
+    </script>
+</body>
+</html>
